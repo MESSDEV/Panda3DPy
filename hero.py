@@ -14,13 +14,22 @@ key_turn_left = 'n' # turn the camera to the right (and the world to the left)
 key_turn_right = 'm' # turn the camera to the left (and the world to the right)
 
 
+key_build = 'b' # build a block in front of you
+key_destroy = 'v' # destroy the block in front of you
+
+
+key_savemap = 'k'
+key_loadmap = 'l'
+
+
 class Hero():
    def __init__(self, pos, land):
        self.land = land
-       self.mode = True # pass through everything mode
+       self.mode = True # get past everything mode
        self.hero = loader.loadModel('smiley')
        self.hero.setColor(1, 0.5, 0)
        self.hero.setScale(0.3)
+       self.hero.setH(180)
        self.hero.setPos(pos)
        self.hero.reparentTo(render)
        self.cameraBind()
@@ -60,9 +69,9 @@ class Hero():
        self.hero.setH((self.hero.getH() - 5) % 360)
 
 
-   def look_at(self):
+   def look_at(self, angle):
        '''returns the coordinates which the hero at the point (x, y) moves to
-       if they step towards angle '''
+       if they step towards angle'''
 
 
        x_from = round(self.hero.getX())
@@ -85,9 +94,11 @@ class Hero():
    def move_to(self, angle):
        if self.mode:
            self.just_move(angle)
+       else:
+           self.try_move(angle)
   
    def check_dir(self,angle):
-       '''returns the rounded changes in the X and Y coordinates
+       ''' returns the rounded changes in the X and Y coordinates
        corresponding to the movement towards the angle.
        The Y coordinate decreases if the hero is looking at a 0-degree angle,
        and increases when they look at a 180-degree angle.   
@@ -141,6 +152,56 @@ class Hero():
        self.move_to(angle)
 
 
+   def changeMode(self):
+       if self.mode:
+           self.mode = False
+       else:
+           self.mode = True
+
+
+  
+   def try_move(self, angle):
+       '''moves if they can'''
+       pos = self.look_at(angle)
+       if self.land.isEmpty(pos):
+           # there's a free space in front of us. Perhaps you need to move down:
+           pos = self.land.findHighestEmpty(pos)
+           self.hero.setPos(pos)
+       else:
+           # there's no free space in front of us. If you can, climb onto that block:
+           pos = pos[0], pos[1], pos[2] + 1
+           if self.land.isEmpty(pos):
+               self.hero.setPos(pos)
+               # unable to climb - we stand still
+   def up(self):
+       if self.mode:
+           self.hero.setZ(self.hero.getZ() + 1)
+
+
+   def down(self):
+       if self.mode and self.hero.getZ() > 1:
+           self.hero.setZ(self.hero.getZ() - 1)
+  
+   def build(self):
+       angle = self.hero.getH() % 360
+       pos = self.look_at(angle)
+       if self.mode:
+           self.land.addBlock(pos)
+       else:
+           self.land.buildBlock(pos)
+
+
+   def destroy(self):
+       angle = self.hero.getH() % 360
+       pos = self.look_at(angle)
+       if self.mode:
+           self.land.delBlock(pos)
+       else:
+           self.land.delBlockFrom(pos)
+
+
+
+
    def accept_events(self):
        base.accept(key_turn_left, self.turn_left)
        base.accept(key_turn_left + '-repeat', self.turn_left)
@@ -159,3 +220,20 @@ class Hero():
 
 
        base.accept(key_switch_camera, self.changeView)
+
+
+       base.accept(key_switch_mode, self.changeMode)
+
+
+       base.accept(key_up, self.up)
+       base.accept(key_up + '-repeat', self.up)
+       base.accept(key_down, self.down)
+       base.accept(key_down + '-repeat', self.down)
+
+
+       base.accept(key_build, self.build)
+       base.accept(key_destroy, self.destroy)
+
+
+       base.accept(key_savemap, self.land.saveMap)
+       base.accept(key_loadmap, self.land.loadMap)
